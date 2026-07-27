@@ -3,26 +3,26 @@ title: "Supervised task runner"
 description: "拉最新代码,读任务文件,逐步执行,记录每步结果,浅层处理错误,最后把结果写成 RESULT.md 并推回指定远端。"
 
 parameters:
-  repo_dir:
-    input_type: String
-    requirement: optional
-    default: "."
-    description: "git 仓库工作目录"
-  task_file:
-    input_type: String
-    requirement: optional
-    default: "TASK.md"
-    description: "要读取并执行的任务/交付文件(相对 repo_dir)"
-  remote:
-    input_type: String
-    requirement: optional
-    default: "origin"
-    description: "拉取和推送的远端名"
-  branch:
-    input_type: String
-    requirement: optional
-    default: ""
-    description: "要操作的分支;留空则用当前已检出的分支"
+- key: repo_dir
+  input_type: string
+  requirement: optional
+  default: "."
+  description: "git 仓库工作目录"
+- key: task_file
+  input_type: string
+  requirement: optional
+  default: "TASK.md"
+  description: "要读取并执行的任务/交付文件(相对 repo_dir)"
+- key: remote
+  input_type: string
+  requirement: optional
+  default: "origin"
+  description: "拉取和推送的远端名"
+- key: branch
+  input_type: string
+  requirement: optional
+  default: ""
+  description: "要操作的分支;留空则用当前已检出的分支"
 
 instructions: |
   你是替我在终端里敲命令的“手”,不是自作主张的决策者。全程遵守:
