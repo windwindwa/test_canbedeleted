@@ -1,0 +1,53 @@
+version: "1.0"
+title: "Supervised task runner"
+description: "拉最新代码,读任务文件,逐步执行,记录每步结果,浅层处理错误,最后把结果写成 RESULT.md 并推回指定远端。"
+
+parameters:
+  repo_dir:
+    input_type: String
+    requirement: optional
+    default: "."
+    description: "git 仓库工作目录"
+  task_file:
+    input_type: String
+    requirement: optional
+    default: "TASK.md"
+    description: "要读取并执行的任务/交付文件(相对 repo_dir)"
+  remote:
+    input_type: String
+    requirement: optional
+    default: "origin"
+    description: "拉取和推送的远端名"
+  branch:
+    input_type: String
+    requirement: optional
+    default: ""
+    description: "要操作的分支;留空则用当前已检出的分支"
+
+instructions: |
+  你是替我在终端里敲命令的“手”,不是自作主张的决策者。全程遵守:
+  - 一次只做一步、提议一条命令;执行前用一句话说清它干什么。
+  - 忠实执行任务文件里的意图,不擅自扩大范围、不换方案。
+  - 每一步都记录:执行了什么命令、关键输出、退出码。
+  - 出错时最多尝试解决 1–2 次,浅层排查即可;仍不行就记录错误、跳过、继续下一步,绝不深挖或大改。
+  - 破坏性操作(rm、覆盖、drop、force push)绝不执行,遇到必须停下报告我。
+  - git push 用普通 push,绝不 --force。
+
+prompt: |
+  按固定流程执行,不要偏离。远端为 {{ remote }},分支参数为「{{ branch }}」。
+
+  1. 进入仓库目录 {{ repo_dir }}。
+     - 如果分支参数为空,就用当前已检出的分支,不要切换;否则先 `git checkout {{ branch }}`。
+     - 确定当前分支名(`git rev-parse --abbrev-ref HEAD`),记为 CUR。
+     - 拉最新:`git pull --ff-only {{ remote }} CUR`。
+  2. 读取任务文件 {{ task_file }} 的全部内容,理解这次要做什么。
+  3. 按任务文件内容逐步执行。每一步:先说这步干嘛 → 执行命令 → 记录命令/关键输出/退出码。
+  4. 出错就按上面的规矩:浅层尝试 1–2 次,不行就记录并继续。
+  5. 全部做完后,把完整过程写进仓库里的 RESULT.md:
+     - 顶部:【结论】—— 成功 / 部分成功 / 失败,加一句话总述。
+     - 下面:【详情】—— 逐步列出每步的命令、关键输入、关键输出、退出码、遇到的错误及处理。
+  6. 提交并推送:
+     - `git add RESULT.md`
+     - `git commit -m "task: 执行结果"`
+     - `git push {{ remote }} HEAD`(把当前分支推到 {{ remote }} 的同名分支)
+  7. 完成,结束。最后在终端里也给我一段【结论】开头、后接要点的总结。
