@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# watch-and-run.sh — 定时用 git 轮询远端指定目标,只要「远端版本 ≠ 上次已执行的版本」就前台运行 goose recipe。
+# watch-and-run.sh — 定时用 git 轮询远端指定目标,只要「远端版本 ≠ 上次成功执行的版本」就前台运行 goose recipe。
 #
-# 有状态:用 .ai/.state/ 下的状态文件记住上次执行的目标版本。
-#   → 启动时若远端有未执行的新任务(首次、或任务已在),立即执行,无需 --run-on-start;已执行过的不重复跑。
+# 有状态:用 .ai/.state/ 下的状态文件记住上次【成功】执行的目标版本。
+#   → 状态只在 goose 退出码 0(成功跑完)时更新;被打断/出错不记,下轮或重启会自动重跑(无需手动改状态)。
+#   → 启动时若远端有未成功执行的任务,立即执行;已成功执行过的不重复跑。
 #
 # 检测:git fetch 后取目标在 origin/<branch> 上的对象 id(文件=blob / 目录=tree)。
 # 可见性:前台、同步调用 goose,继承 TTY——像手敲一样可见、approve 模式可审批。请跑在 tmux 里。一次只跑一个。
@@ -12,6 +13,7 @@
 #   --interval SEC   轮询间隔秒数(默认 60)
 #   --recipe PATH    要跑的 recipe(默认 .ai/supervised-runner.yaml)
 #   --branch NAME    分支(默认当前分支)
+#   --run-on-start   逃生舱:启动时强制重跑当前任务一次(忽略状态),之后正常监视
 #   --once           只跑一轮(测试用)
 #   --dry-run        只打印,不真正调 goose(测试用)
 #   -h, --help       显示帮助
@@ -25,9 +27,10 @@ RECIPE=".ai/supervised-runner.yaml"
 BRANCH=""
 ONCE=0
 DRY_RUN=0
+RUN_ON_START=0
 TARGET=""
 
-usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
 log() { echo "[$(date '+%F %T')] $*"; }
 
 while [[ $# -gt 0 ]]; do
@@ -35,9 +38,9 @@ while [[ $# -gt 0 ]]; do
     --interval) INTERVAL="${2:?}"; shift 2;;
     --recipe)   RECIPE="${2:?}";   shift 2;;
     --branch)   BRANCH="${2:?}";   shift 2;;
+    --run-on-start) RUN_ON_START=1; shift;;
     --once)     ONCE=1;    shift;;
     --dry-run)  DRY_RUN=1; shift;;
-    --run-on-start) log "提示：--run-on-start 已废弃(有状态版本会自动跑未执行的任务),忽略。"; shift;;
     -h|--help)  usage; exit 0;;
     -*) echo "未知选项：$1" >&2; usage; exit 2;;
     *)  TARGET="$1"; shift;;
@@ -56,7 +59,7 @@ if _adir="$(cd "$(dirname -- "$TARGET")" 2>/dev/null && pwd)"; then
 else
   RELPATH="$TARGET"
 fi
-# 状态文件放 .ai/.state/,按目标区分
+# 状态文件放 .ai/.state/,按目标区分,存"上次成功执行的目标版本"
 STATE_DIR="$REPO_ROOT/.ai/.state"; mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/last-run.$(printf '%s' "$RELPATH" | tr '/ ' '__')"
 
@@ -66,29 +69,46 @@ remote_version() {
   git rev-parse "origin/$BRANCH:$RELPATH" 2>/dev/null || return 1
 }
 
+# 运行 goose,返回其真实退出码
 run_goose() {
-  log "远端有新任务 → 运行 goose recipe：$RECIPE"
+  log "运行 goose recipe：$RECIPE"
   if [[ "$DRY_RUN" == 1 ]]; then
     log "[dry-run] 本应执行：goose run --recipe \"$RECIPE\""
-  else
-    goose run --recipe "$RECIPE"   # 前台、继承 TTY：可见、可交互审批
-    log "goose 运行结束(退出码 $?)"
+    return 0
   fi
+  goose run --recipe "$RECIPE"   # 前台、继承 TTY：可见、可交互审批
+  local rc=$?
+  log "goose 运行结束(退出码 $rc)"
+  return $rc
 }
 
 log "开始监视远端(有状态)：target=$RELPATH  branch=$BRANCH  interval=${INTERVAL}s  recipe=$RECIPE"
 LAST="$(cat "$STATE_FILE" 2>/dev/null || true)"
-log "上次已执行版本：${LAST:-<无，首次>}"
+log "上次成功执行版本：${LAST:-<无，首次>}"
 
+first=1
 while true; do
   CUR="$(remote_version || true)"
   if [[ -z "$CUR" ]]; then
     log "警告：获取远端目标版本失败(fetch 失败或目标不存在),跳过本轮。"
-  elif [[ "$CUR" != "$LAST" ]]; then
-    log "远端有新任务：${LAST:-<无>} → $CUR"
-    run_goose
-    LAST="$CUR"; printf '%s\n' "$LAST" > "$STATE_FILE"
+  else
+    force_start=0
+    [[ "$first" == 1 && "$RUN_ON_START" == 1 ]] && force_start=1
+    if [[ "$CUR" != "$LAST" || "$force_start" == 1 ]]; then
+      if [[ "$force_start" == 1 && "$CUR" == "$LAST" ]]; then
+        log "--run-on-start：强制重跑当前任务 $CUR"
+      else
+        log "远端有新任务：${LAST:-<无>} → $CUR"
+      fi
+      # 只有 goose 成功跑完(退出码0)才记状态;被打断/出错则不记,下轮/重启自动重跑
+      if run_goose; then
+        LAST="$CUR"; printf '%s\n' "$LAST" > "$STATE_FILE"
+      else
+        log "goose 未成功完成(被打断/出错),不记状态,将自动重试。"
+      fi
+    fi
   fi
+  first=0
   [[ "$ONCE" == 1 ]] && break
   sleep "$INTERVAL"
 done
