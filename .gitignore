@@ -1,5 +1,7 @@
-# watcher 状态文件(记录上次已执行的目标版本)
-.watch-last-run.*
-# 各节点在执行端本地产出的中间文件(不回传)
+# watcher 状态文件
+.ai/.state/
+# 节点在执行端本地产出的中间文件(不回传)
+.ai/outputs/
+# 旧根目录遗留产物(历史)
 node*.txt
 proof.txt
