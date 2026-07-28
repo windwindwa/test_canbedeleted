@@ -1,22 +1,24 @@
-# 任务:流水线连通性验证(第 1 次实验)
+# 任务：节点1 / 目标1 — 建立基线（NODE: 1）
 
 ## 目标
-验证 Goose 能:拉取本仓库 → 逐步执行下面这些简单命令 → 记录每步结果 → 把 RESULT.md 推回。
-这一轮全部是安全、只读或只新增的命令,不改动任何已有文件。
+在容器里建立一个基线产物文件 `node1.txt`，供节点2使用。
 
-## 步骤(参考命令,可按实际微调)
-1. 打印环境信息,确认在容器里 —— 参考:`uname -a`、`whoami`、`pwd`、`date`
-2. 确认在正确的仓库和分支 —— 参考:`git rev-parse --abbrev-ref HEAD`、`git log -1 --oneline`
-3. 创建一个证明文件 —— 参考:`echo "goose was here at $(date)" > proof.txt`,然后 `cat proof.txt`
-4. 做一个简单计算,验证能拿到命令输出 —— 参考:`echo $((2 + 40))`(期望输出 42)
+## 步骤（参考命令，可按实际微调）
+1. 打印主机名与时间，确认环境 —— 参考：`hostname`、`date`
+2. 计算基线值 7*6 —— 参考：`echo $((7 * 6))`（期望 42）
+3. 写入基线文件 —— 参考：
+   `printf "host=%s\ntime=%s\nbaseline=%s\n" "$(hostname)" "$(date)" "$((7 * 6))" > node1.txt`
+   然后 `cat node1.txt`
 
 ## 成功标准
-- 每一步的命令、关键输出、退出码都被记录进 RESULT.md
-- proof.txt 被创建且内容包含时间戳
-- 第 4 步输出为 42
-- RESULT.md 顶部有一段【结论】
+- `node1.txt` 被创建，且包含一行 `baseline=42`
+- 各步退出码为 0
+
+## 结果记录要求
+- 在 RESULT.md 结论区**第一行**写：`NODE: 1`
+- 在详情里明确写出 `node1.txt` 的完整内容
 
 ## 禁止
 - 不要删除任何已有文件
-- 不要修改 supervised-runner.yaml 和 TASK.md 本身
+- 不要修改 supervised-runner.yaml、TASK.md、PLAN.md、watch-and-run.sh 本身
 - 不要 force push
