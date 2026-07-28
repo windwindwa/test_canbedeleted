@@ -35,13 +35,13 @@ graph LR
 ### 节点 1 / 目标 1：建立基线
 - 派发（`NODE: 1`）：创建 `.ai/outputs/node1.txt`，含 `baseline=42`（由 `7*6`）。
 - 成功标准：RESULT `NODE: 1`；`node1.txt` 含 `baseline=42`；退出码 0。
-- [ ] 完成
+- [x] 完成（2026-07-28）
 
 ### 节点 2 / 目标 2：基线 +100（收尾）
 - 前提：`.ai/outputs/node1.txt` 存在。
 - 派发（`NODE: 2`）：读 node1 的 42，+100，产出 `.ai/outputs/node2.txt` 含 `result=142`。
 - 成功标准：RESULT `NODE: 2`；`node2.txt` 含 `result=142`；退出码 0。
-- [ ] 完成
+- [x] 完成（2026-07-28）
 
 > [!note] 依赖为什么成立
 > 各 `.ai/outputs/nodeK.txt` 由 Goose 在同一 Ubuntu 执行端本地产出（gitignore、不回传但留在本地），下一节点在同一容器直接读得到。我这边靠 `.ai/RESULT.md` 记录的内容验证。
